@@ -56,6 +56,7 @@ export function Home() {
   useEffect(() => {
     let interval: number
 
+    // Se tiver um ciclo ativo, execute o setInterval:
     if (activeCycle) {
       interval = setInterval(() => {
         const secondsDifference = differenceInSeconds(
@@ -75,6 +76,7 @@ export function Home() {
             }),
           )
 
+          console.log(totalSeconds)
           setAmountSecondsPassed(totalSeconds)
           clearInterval(interval)
         } else {
@@ -136,8 +138,6 @@ export function Home() {
     }
   }, [minutes, seconds, activeCycle])
 
-  console.log(cycles)
-
   const task = watch('task')
   const isSubmitDisabled = !task
 
@@ -178,7 +178,6 @@ export function Home() {
           <span>minutos.</span>
         </FormContainer>
 
-        {/* Coutdown */}
         <CountdownContainer>
           <span>{minutes[0]}</span>
           <span>{minutes[1]}</span>
