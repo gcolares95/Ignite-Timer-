@@ -1,19 +1,16 @@
-import { useEffect, useState } from 'react'
+import { useContext } from 'react'
 import { HandPalm, Play } from 'phosphor-react'
-import { useForm } from 'react-hook-form'
+import { Countdown } from './components/Countdown'
+import { FormProvider, useForm } from 'react-hook-form'
 import * as zod from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { NewCycleForm } from './components/NewCycleForm'
 import {
-  CountdownContainer,
-  FormContainer,
   HomeContainer,
-  MinutesAmountInput,
-  Separator,
   StartCoutdownButton,
   StopCoutdownButton,
-  TaskInput,
 } from './styles'
-import { differenceInSeconds } from 'date-fns'
+import { CyclesContext } from '../../contexts/CyclesContext'
 
 // Schema (Formato) de validação zod
 const newCycleFormValidationSchema = zod.object({
@@ -26,21 +23,11 @@ const newCycleFormValidationSchema = zod.object({
 
 type NewCycleFormData = zod.infer<typeof newCycleFormValidationSchema>
 
-interface Cycle {
-  id: string
-  task: string
-  minutesAmount: number
-  startDate: Date
-  interruptedDate?: Date
-  finishedDate?: Date
-}
-
 export function Home() {
-  const [cycles, setCycles] = useState<Cycle[]>([])
-  const [activeCycleId, setActiveCycleId] = useState<string | null>(null)
-  const [amountSecondsPassed, setAmountSecondsPassed] = useState(0)
+  const { createNewCycle, interruptCurrentCycle, activeCycle } =
+    useContext(CyclesContext)
 
-  const { register, handleSubmit, watch, reset } = useForm<NewCycleFormData>({
+  const newCycleForm = useForm<NewCycleFormData>({
     resolver: zodResolver(newCycleFormValidationSchema),
     defaultValues: {
       task: '',
@@ -48,146 +35,21 @@ export function Home() {
     },
   })
 
-  // Buscando o ciclo ativo
-  const activeCycle = cycles.find((cycle) => cycle.id === activeCycleId)
-
-  const totalSeconds = activeCycle ? activeCycle.minutesAmount * 60 : 0
-
-  useEffect(() => {
-    let interval: number
-
-    // Se tiver um ciclo ativo, execute o setInterval:
-    if (activeCycle) {
-      interval = setInterval(() => {
-        const secondsDifference = differenceInSeconds(
-          new Date(),
-          activeCycle.startDate,
-        )
-        if (secondsDifference >= totalSeconds) {
-          setCycles((state) =>
-            state.map((cycle) => {
-              // Busca o ciclo ativo
-              if (cycle.id === activeCycleId) {
-                // Retorna as propriedades que já existem, mais a data de interrupção
-                return { ...cycle, finishedDate: new Date() }
-              } else {
-                return cycle
-              }
-            }),
-          )
-
-          console.log(totalSeconds)
-          setAmountSecondsPassed(totalSeconds)
-          clearInterval(interval)
-        } else {
-          setAmountSecondsPassed(secondsDifference)
-        }
-      }, 1000)
-    }
-
-    return () => {
-      clearInterval(interval)
-    }
-
-    // Função para "resetar" ações do useEffect anterior
-  }, [activeCycle, totalSeconds, activeCycleId])
-
-  function handleCreateNewCycle(data: NewCycleFormData) {
-    const id = String(new Date().getTime())
-    const newCycle: Cycle = {
-      id,
-      minutesAmount: data.minutesAmount,
-      task: data.task,
-      startDate: new Date(),
-    }
-
-    setCycles((state) => [...state, newCycle])
-    setActiveCycleId(id)
-    setAmountSecondsPassed(0)
-
-    reset()
-  }
-
-  function handleInterruptCcyle() {
-    setCycles((state) =>
-      state.map((cycle) => {
-        // Busca o ciclo ativo
-        if (cycle.id === activeCycleId) {
-          // Retorna as propriedades que já existem, mais a data de interrupção
-          return { ...cycle, interruptedDate: new Date() }
-        } else {
-          return cycle
-        }
-      }),
-    )
-
-    setActiveCycleId(null)
-  }
-
-  const currentSeconds = activeCycle ? totalSeconds - amountSecondsPassed : 0
-
-  const minutesAmount = Math.floor(currentSeconds / 60)
-  const secondsAmount = currentSeconds % 60
-
-  const minutes = String(minutesAmount).padStart(2, '0')
-  const seconds = String(secondsAmount).padStart(2, '0')
-
-  useEffect(() => {
-    if (activeCycle) {
-      document.title = `${minutes}:${seconds}`
-    }
-  }, [minutes, seconds, activeCycle])
+  const { handleSubmit, watch /* reset */ } = newCycleForm
 
   const task = watch('task')
   const isSubmitDisabled = !task
 
   return (
     <HomeContainer>
-      <form onSubmit={handleSubmit(handleCreateNewCycle)} action="">
-        {/* Formulario */}
-        <FormContainer>
-          <label htmlFor="task">Vou trabalhar em</label>
-          <TaskInput
-            id="task"
-            list="task-suggestions"
-            placeholder="Dê um nome para seu projeto"
-            disabled={!!activeCycle}
-            {...register('task')}
-          />
-
-          <datalist id="task-suggestions">
-            <option value="projeto 1"></option>
-            <option value="projeto 2"></option>
-            <option value="projeto 3"></option>
-          </datalist>
-
-          <label htmlFor="">durante</label>
-          <MinutesAmountInput
-            type="number"
-            id="minutesAmount"
-            placeholder="00"
-            step={5}
-            min={1}
-            max={60}
-            disabled={!!activeCycle}
-            {...register('minutesAmount', {
-              valueAsNumber: true,
-            })}
-          />
-
-          <span>minutos.</span>
-        </FormContainer>
-
-        <CountdownContainer>
-          <span>{minutes[0]}</span>
-          <span>{minutes[1]}</span>
-          <Separator>:</Separator>
-          <span>{seconds[0]}</span>
-          <span>{seconds[1]}</span>
-        </CountdownContainer>
+      <form onSubmit={handleSubmit(createNewCycle)} action="">
+        <FormProvider {...newCycleForm}>
+          <NewCycleForm />
+        </FormProvider>
+        <Countdown />
 
         {activeCycle ? (
-          <StopCoutdownButton type="submit" onClick={handleInterruptCcyle}>
+          <StopCoutdownButton type="submit" onClick={interruptCurrentCycle}>
             <HandPalm size={24} />
             Interromper
           </StopCoutdownButton>
